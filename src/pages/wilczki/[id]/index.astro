@@ -1,7 +1,7 @@
 ---
 import AppLayout from "@/layouts/AppLayout.astro";
 import { createClient } from "@/lib/supabase";
-import type { Wilczek, Rodzic, Zbiorka, Obecnosc, Skladka } from "@/types";
+import type { Wilczek, Rodzic, Zbiorka, Obecnosc, Skladka, Sprawnosc, WilczekSprawnosc, Funkcja } from "@/types";
 
 const { id } = Astro.params;
 const tab = Astro.url.searchParams.get("tab") ?? "dane";
@@ -21,6 +21,8 @@ const { data: rodzice } = (await supabase.from("rodzice").select("*").eq("wilcze
 let zbiorki: Zbiorka[] | null = null;
 let obecnosciWilczka: Obecnosc[] | null = null;
 let skladki: Skladka[] | null = null;
+let wilczekSprawnosci: (WilczekSprawnosc & { sprawnosci: Sprawnosc })[] | null = null;
+let funkcje: Funkcja[] | null = null;
 
 // prettier-ignore
 if (tab === "obecnosci") {
@@ -38,6 +40,27 @@ if (tab === "skladki") {
   skladki = skladkiRes.data as Skladka[] | null;
 }
 
+// prettier-ignore
+if (tab === "sprawnosci") {
+  const res = await supabase.from("wilczek_sprawnosci").select("*, sprawnosci(*)").eq("wilczek_id", id).order("data_uzyskania", { ascending: false });
+  wilczekSprawnosci = res.data as (WilczekSprawnosc & { sprawnosci: Sprawnosc })[] | null;
+}
+
+// prettier-ignore
+if (tab === "funkcje") {
+  const res = await supabase.from("funkcje").select("*").eq("wilczek_id", id).order("data_od", { ascending: false });
+  funkcje = res.data as Funkcja[] | null;
+}
+
+const sprawnosccByKat = new Map<string, (WilczekSprawnosc & { sprawnosci: Sprawnosc })[]>();
+for (const ws of wilczekSprawnosci ?? []) {
+  const kat = ws.sprawnosci.kategoria ?? "Inne";
+  const list = sprawnosccByKat.get(kat) ?? [];
+  list.push(ws);
+  sprawnosccByKat.set(kat, list);
+}
+const sprawnosccKats = [...sprawnosccByKat.keys()].sort();
+
 const obecnoscMap = new Map((obecnosciWilczka ?? []).map((o) => [o.zbiorka_id, o.obecny]));
 const totalZbiorki = zbiorki?.length ?? 0;
 const liczbaObecnych = (zbiorki ?? []).filter((z) => obecnoscMap.get(z.id) === true).length;
@@ -46,6 +69,7 @@ const procent = totalZbiorki > 0 ? Math.round((liczbaObecnych / totalZbiorki) * 
 const tabs = [
   { id: "dane", label: "Dane" },
   { id: "sprawnosci", label: "Sprawności" },
+  { id: "funkcje", label: "Funkcje" },
   { id: "obecnosci", label: "Obecności" },
   { id: "skladki", label: "Składki" },
 ] as const;
@@ -198,9 +222,126 @@ function formatRelacja(r: string | null) {
   <!-- Sprawności -->
   {
     tab === "sprawnosci" && (
-      <div class="rounded-lg border border-dashed border-gray-300 bg-white p-12 text-center text-gray-500">
-        <p class="text-lg font-medium text-gray-400">Brak przypisanych sprawności</p>
-        <p class="mt-1 text-sm">Moduł sprawności zostanie dodany w kolejnym etapie.</p>
+      <div class="space-y-4">
+        <div class="flex justify-end">
+          <a
+            href={`/wilczki/${wilczek.id}/sprawnosc/nowa`}
+            class="rounded-md bg-green-700 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-green-800"
+          >
+            + Przypisz sprawność
+          </a>
+        </div>
+        {(wilczekSprawnosci ?? []).length === 0 ? (
+          <div class="rounded-lg border border-dashed border-gray-300 bg-white p-12 text-center text-gray-500">
+            <p class="text-lg font-medium text-gray-400">Brak przypisanych sprawności</p>
+            <a
+              href={`/wilczki/${wilczek.id}/sprawnosc/nowa`}
+              class="mt-2 inline-block text-sm text-green-700 hover:underline"
+            >
+              Przypisz pierwszą sprawność →
+            </a>
+          </div>
+        ) : (
+          <div class="space-y-4">
+            {sprawnosccKats.map((kat) => (
+              <div class="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
+                <div class="border-b border-gray-100 bg-gray-50 px-5 py-3">
+                  <h3 class="text-xs font-semibold tracking-wide text-gray-500 uppercase">{kat}</h3>
+                </div>
+                <table class="w-full text-sm">
+                  <tbody class="divide-y divide-gray-100">
+                    {(sprawnosccByKat.get(kat) ?? []).map((ws) => (
+                      <tr class="transition-colors hover:bg-gray-50">
+                        <td class="px-5 py-3 font-medium text-gray-900">{ws.sprawnosci.nazwa}</td>
+                        <td class="px-5 py-3 text-gray-500">
+                          {ws.data_uzyskania ? formatDate(ws.data_uzyskania) : "—"}
+                        </td>
+                        <td class="px-5 py-3 text-right">
+                          <button
+                            class="text-red-500 hover:underline"
+                            data-delete-ws-id={ws.id}
+                            data-delete-ws-name={ws.sprawnosci.nazwa}
+                          >
+                            Usuń
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  <!-- Funkcje -->
+  {
+    tab === "funkcje" && (
+      <div class="space-y-4">
+        <div class="rounded-lg border border-gray-200 bg-white shadow-sm">
+          <div class="flex items-center justify-between border-b border-gray-100 px-6 py-4">
+            <h2 class="text-sm font-semibold tracking-wide text-gray-500 uppercase">Historia funkcji</h2>
+            <a
+              href={`/wilczki/${wilczek.id}/funkcja/nowa`}
+              class="rounded-md bg-green-700 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-green-800"
+            >
+              + Dodaj funkcję
+            </a>
+          </div>
+          {funkcje && funkcje.length > 0 ? (
+            <table class="w-full text-sm">
+              <thead class="bg-gray-50 text-left text-xs font-semibold tracking-wide text-gray-500 uppercase">
+                <tr>
+                  <th class="px-4 py-3">Funkcja</th>
+                  <th class="px-4 py-3">Od</th>
+                  <th class="px-4 py-3">Do</th>
+                  <th class="px-4 py-3">Status</th>
+                  <th class="px-4 py-3" />
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-gray-100">
+                {funkcje.map((f: Funkcja) => (
+                  <tr class="transition-colors hover:bg-gray-50">
+                    <td class="px-4 py-3 font-medium text-gray-900">{f.nazwa}</td>
+                    <td class="px-4 py-3 text-gray-600">{formatDate(f.data_od)}</td>
+                    <td class="px-4 py-3 text-gray-600">{f.data_do ? formatDate(f.data_do) : "—"}</td>
+                    <td class="px-4 py-3">
+                      {!f.data_do ? (
+                        <span class="inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-700">
+                          Aktualnie pełni
+                        </span>
+                      ) : (
+                        <span class="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-600">
+                          Zakończona
+                        </span>
+                      )}
+                    </td>
+                    <td class="px-4 py-3 text-right">
+                      <a
+                        href={`/wilczki/${wilczek.id}/funkcja/${f.id}/edytuj`}
+                        class="mr-3 text-blue-600 hover:underline"
+                      >
+                        Edytuj
+                      </a>
+                      <button
+                        class="text-red-500 hover:underline"
+                        data-delete-funkcja-id={f.id}
+                        data-delete-funkcja-name={f.nazwa}
+                      >
+                        Usuń
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : (
+            <div class="px-6 py-8 text-center text-sm text-gray-500">Brak zarejestrowanych funkcji.</div>
+          )}
+        </div>
       </div>
     )
   }
@@ -360,6 +501,36 @@ function formatRelacja(r: string | null) {
       if (!confirm(`Usuń składkę za rok ${rok}? Tej operacji nie można cofnąć.`)) return;
 
       const res = await fetch(`/api/skladki/${id}`, { method: "DELETE" });
+      if (res.ok) {
+        window.location.reload();
+      } else {
+        alert("Błąd podczas usuwania. Spróbuj ponownie.");
+      }
+    });
+  });
+
+  document.querySelectorAll("[data-delete-ws-id]").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const id = (btn as HTMLElement).dataset.deleteWsId!;
+      const name = (btn as HTMLElement).dataset.deleteWsName!;
+      if (!confirm(`Usuń sprawność „${name}"? Tej operacji nie można cofnąć.`)) return;
+
+      const res = await fetch(`/api/wilczek-sprawnosci/${id}`, { method: "DELETE" });
+      if (res.ok) {
+        window.location.reload();
+      } else {
+        alert("Błąd podczas usuwania. Spróbuj ponownie.");
+      }
+    });
+  });
+
+  document.querySelectorAll("[data-delete-funkcja-id]").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const id = (btn as HTMLElement).dataset.deleteFunkcjaId!;
+      const name = (btn as HTMLElement).dataset.deleteFunkcjaName!;
+      if (!confirm(`Usuń funkcję „${name}"? Tej operacji nie można cofnąć.`)) return;
+
+      const res = await fetch(`/api/funkcje/${id}`, { method: "DELETE" });
       if (res.ok) {
         window.location.reload();
       } else {

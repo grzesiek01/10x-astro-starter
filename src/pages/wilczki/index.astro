@@ -1,12 +1,21 @@
 ---
 import AppLayout from "@/layouts/AppLayout.astro";
 import { createClient } from "@/lib/supabase";
-import type { Wilczek } from "@/types";
+import type { Wilczek, Funkcja } from "@/types";
 
 const supabase = createClient(Astro.request.headers, Astro.cookies);
-const { data: wilczki } = supabase
-  ? await supabase.from("wilczki").select("*").order("nazwisko").order("imie")
-  : { data: [] as Wilczek[] };
+
+const [wilczkiRes, funkcjeRes] = supabase
+  ? await Promise.all([
+      supabase.from("wilczki").select("*").order("nazwisko").order("imie"),
+      supabase.from("funkcje").select("wilczek_id, nazwa").is("data_do", null),
+    ])
+  : [{ data: [] as Wilczek[] }, { data: [] as Funkcja[] }];
+
+const wilczki = (wilczkiRes.data ?? []) as Wilczek[];
+const aktualnaFunkcjaMap = new Map(
+  ((funkcjeRes.data ?? []) as Pick<Funkcja, "wilczek_id" | "nazwa">[]).map((f) => [f.wilczek_id, f.nazwa]),
+);
 
 function formatDate(iso: string | null) {
   if (!iso) return "—";
@@ -27,15 +36,15 @@ function formatDate(iso: string | null) {
   </div>
 
   {
-    wilczki && wilczki.length > 0 ? (
+    wilczki.length > 0 ? (
       <div class="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
         <table class="w-full text-sm">
           <thead class="bg-gray-50 text-left text-xs font-semibold tracking-wide text-gray-500 uppercase">
             <tr>
               <th class="px-4 py-3">Imię i nazwisko</th>
+              <th class="px-4 py-3">Szóstka</th>
+              <th class="px-4 py-3">Funkcja</th>
               <th class="px-4 py-3">Data urodzenia</th>
-              <th class="px-4 py-3">PESEL</th>
-              <th class="px-4 py-3">Miejscowość</th>
               <th class="px-4 py-3" />
             </tr>
           </thead>
@@ -45,9 +54,9 @@ function formatDate(iso: string | null) {
                 <td class="px-4 py-3 font-medium text-gray-900">
                   {w.imie} {w.nazwisko}
                 </td>
+                <td class="px-4 py-3 text-gray-600">{w.szostka ?? "—"}</td>
+                <td class="px-4 py-3 text-gray-600">{aktualnaFunkcjaMap.get(w.id) ?? "—"}</td>
                 <td class="px-4 py-3 text-gray-600">{formatDate(w.data_urodzenia)}</td>
-                <td class="px-4 py-3 font-mono text-gray-600">{w.pesel ?? "—"}</td>
-                <td class="px-4 py-3 text-gray-600">{w.miasto ?? "—"}</td>
                 <td class="px-4 py-3 text-right">
                   <a href={`/wilczki/${w.id}`} class="mr-3 text-green-700 hover:underline">
                     Profil

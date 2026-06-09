@@ -1,5 +1,7 @@
 import { useState } from "react";
 import type { Wilczek, WilczekFormData } from "@/types";
+
+const SZOSTKI = ["Biała", "Szara", "Czarna", "Brunatna"] as const;
 import {
   isValidPesel,
   isValidKodPocztowy,
@@ -20,6 +22,7 @@ const empty: WilczekFormData = {
   ulica: "",
   miasto: "",
   kod_pocztowy: "",
+  szostka: "",
 };
 
 function toFormData(w: Wilczek): WilczekFormData {
@@ -31,6 +34,7 @@ function toFormData(w: Wilczek): WilczekFormData {
     ulica: w.ulica ?? "",
     miasto: w.miasto ?? "",
     kod_pocztowy: w.kod_pocztowy ?? "",
+    szostka: w.szostka ?? "",
   };
 }
 
@@ -42,7 +46,7 @@ export default function WilczekForm({ wilczek }: Props) {
   const [saving, setSaving] = useState(false);
 
   function set(field: keyof WilczekFormData) {
-    return (e: React.ChangeEvent<HTMLInputElement>) => {
+    return (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
       setForm((prev) => ({ ...prev, [field]: e.target.value }));
       setErrors((prev) => ({ ...prev, [field]: undefined }));
     };
@@ -75,6 +79,7 @@ export default function WilczekForm({ wilczek }: Props) {
       const body = {
         ...form,
         data_urodzenia: form.data_urodzenia ? dataUrodzeniaToIso(form.data_urodzenia) : "",
+        szostka: form.szostka || null,
       };
 
       const res = await fetch(url, {
@@ -142,6 +147,22 @@ export default function WilczekForm({ wilczek }: Props) {
               placeholder="00000000000"
               maxLength={11}
             />
+          </Field>
+        </div>
+      </section>
+
+      <section>
+        <h2 className="mb-4 text-sm font-semibold tracking-wide text-gray-500 uppercase">Szóstka</h2>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="Szóstka">
+            <select value={form.szostka} onChange={set("szostka")} className={inputClass(false)}>
+              <option value="">— brak przypisania —</option>
+              {SZOSTKI.map((s) => (
+                <option key={s} value={s}>
+                  {s}
+                </option>
+              ))}
+            </select>
           </Field>
         </div>
       </section>

@@ -62,6 +62,7 @@ export interface Wilczek {
   ulica: string | null;
   miasto: string | null;
   kod_pocztowy: string | null;
+  szostka: string | null;
   created_at: string;
 }
 
@@ -73,4 +74,45 @@ export interface WilczekFormData {
   ulica: string;
   miasto: string;
   kod_pocztowy: string;
+  szostka: string;
+}
+
+export interface Sprawnosc {
+  id: string;
+  nazwa: string;
+  opis: string | null;
+  kategoria: string | null;
+}
+
+export interface SprawnosccFormData {
+  nazwa: string;
+  opis: string;
+  kategoria: string;
+}
+
+export interface WilczekSprawnosc {
+  id: string;
+  wilczek_id: string;
+  sprawnosc_id: string;
+  data_uzyskania: string | null;
+  sprawnosci?: Sprawnosc;
+}
+
+export interface WilczekSprawnosccFormData {
+  sprawnosc_id: string;
+  data_uzyskania: string;
+}
+
+export interface Funkcja {
+  id: string;
+  wilczek_id: string;
+  nazwa: string;
+  data_od: string;
+  data_do: string | null;
+}
+
+export interface FunkcjaFormData {
+  nazwa: string;
+  data_od: string;
+  data_do: string;
 }
