@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { Sprawnosc } from "@/types";
+import { isFutureIsoDate } from "@/lib/validators";
 
 interface Props {
   wilczekId: string;
@@ -12,6 +13,7 @@ export default function WilczekSprawnosccForm({ wilczekId, sprawnosci, assignedI
   const [sprawnosccId, setSprawnosccId] = useState(available[0]?.id ?? "");
   const [dataUzyskania, setDataUzyskania] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [dateError, setDateError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
   const categories = [...new Set(available.map((s) => s.kategoria ?? "Inne"))].sort();
@@ -22,8 +24,13 @@ export default function WilczekSprawnosccForm({ wilczekId, sprawnosci, assignedI
       setError("Wybierz sprawność");
       return;
     }
+    if (dataUzyskania && isFutureIsoDate(dataUzyskania)) {
+      setDateError("Data uzyskania nie może być w przyszłości");
+      return;
+    }
     setSaving(true);
     setError(null);
+    setDateError(null);
 
     try {
       const res = await fetch("/api/wilczek-sprawnosci", {
@@ -91,9 +98,11 @@ export default function WilczekSprawnosccForm({ wilczekId, sprawnosci, assignedI
           value={dataUzyskania}
           onChange={(e) => {
             setDataUzyskania(e.target.value);
+            setDateError(null);
           }}
-          className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-green-500 focus:ring-2 focus:ring-green-300 focus:outline-none"
+          className={`w-full rounded-md border px-3 py-2 text-sm text-gray-900 focus:ring-2 focus:outline-none ${dateError ? "border-red-400 focus:ring-red-300" : "border-gray-300 focus:border-green-500 focus:ring-green-300"}`}
         />
+        {dateError && <p className="mt-1 text-xs text-red-600">{dateError}</p>}
       </div>
 
       <div className="flex items-center gap-3">

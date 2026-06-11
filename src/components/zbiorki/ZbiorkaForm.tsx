@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { Zbiorka, ZbiorkaFormData } from "@/types";
-import { isValidDataUrodzenia, dataUrodzeniaToIso, isoToDataUrodzenia } from "@/lib/validators";
+import { isValidDataUrodzenia, isFutureIsoDate, dataUrodzeniaToIso, isoToDataUrodzenia } from "@/lib/validators";
 
 interface Props {
   zbiorka?: Zbiorka;
@@ -36,6 +36,8 @@ export default function ZbiorkaForm({ zbiorka }: Props) {
       next.data = "Data jest wymagana";
     } else if (!isValidDataUrodzenia(form.data)) {
       next.data = "Nieprawidłowa data (format: DD.MM.RRRR)";
+    } else if (isFutureIsoDate(dataUrodzeniaToIso(form.data))) {
+      next.data = "Data nie może być w przyszłości";
     }
     setErrors(next);
     return Object.keys(next).length === 0;

@@ -12,6 +12,12 @@ const currentYear = new Date().getFullYear();
 const rokParam = Astro.url.searchParams.get("rok");
 const rok = rokParam ? parseInt(rokParam, 10) : currentYear;
 
+const SORT_COLS = ["wilczek", "zaplacono", "kwota", "data_wplaty"] as const;
+type SortCol = (typeof SORT_COLS)[number];
+const rawSort = Astro.url.searchParams.get("sort") ?? "wilczek";
+const sortBy: SortCol = (SORT_COLS as readonly string[]).includes(rawSort) ? (rawSort as SortCol) : "wilczek";
+const sortDir = Astro.url.searchParams.get("dir") === "desc" ? "desc" : "asc";
+
 const [{ data: wilczki }, { data: skladki }] = await Promise.all([
   supabase.from("wilczki").select("id, imie, nazwisko").order("nazwisko").order("imie"),
   supabase.from("skladki").select("*").eq("rok", rok),
@@ -20,10 +26,31 @@ const [{ data: wilczki }, { data: skladki }] = await Promise.all([
 const skladkaMap = new Map<string, Skladka>(((skladki as Skladka[] | null) ?? []).map((s) => [s.wilczek_id, s]));
 
 const typedWilczki: WilczekRow[] = wilczki ?? [];
-const rows = typedWilczki.map((w) => ({
+let rows = typedWilczki.map((w) => ({
   wilczek: w,
   skladka: skladkaMap.get(w.id) ?? null,
 }));
+
+rows.sort((a, b) => {
+  let cmp = 0;
+  if (sortBy === "wilczek") {
+    cmp =
+      a.wilczek.nazwisko.localeCompare(b.wilczek.nazwisko, "pl") || a.wilczek.imie.localeCompare(b.wilczek.imie, "pl");
+  } else if (sortBy === "zaplacono") {
+    const av = a.skladka?.zaplacono ? 1 : 0;
+    const bv = b.skladka?.zaplacono ? 1 : 0;
+    cmp = av - bv;
+  } else if (sortBy === "kwota") {
+    const av = a.skladka?.kwota ?? -1;
+    const bv = b.skladka?.kwota ?? -1;
+    cmp = av - bv;
+  } else {
+    const av = a.skladka?.data_wplaty ?? "";
+    const bv = b.skladka?.data_wplaty ?? "";
+    cmp = av < bv ? -1 : av > bv ? 1 : 0;
+  }
+  return sortDir === "asc" ? cmp : -cmp;
+});
 
 const zaplacono = rows.filter((r) => r.skladka?.zaplacono).length;
 const niezaplacono = rows.filter((r) => !r.skladka?.zaplacono).length;
@@ -34,6 +61,17 @@ function formatDate(iso: string | null) {
   if (!iso) return "—";
   const [y, m, d] = iso.split("-");
   return `${d}.${m}.${y}`;
+}
+
+function sortUrl(col: SortCol) {
+  const defaultDesc = col !== "wilczek";
+  const newDir = sortBy === col ? (sortDir === "asc" ? "desc" : "asc") : defaultDesc ? "desc" : "asc";
+  return `/skladki?rok=${rok}&sort=${col}&dir=${newDir}`;
+}
+
+function sortIcon(col: SortCol) {
+  if (sortBy !== col) return "↕";
+  return sortDir === "asc" ? "↑" : "↓";
 }
 ---
 
@@ -77,10 +115,26 @@ function formatDate(iso: string | null) {
     <table class="w-full text-sm">
       <thead class="bg-gray-50 text-left text-xs font-semibold tracking-wide text-gray-500 uppercase">
         <tr>
-          <th class="px-4 py-3">Wilczek</th>
-          <th class="px-4 py-3">Status</th>
-          <th class="px-4 py-3">Kwota</th>
-          <th class="px-4 py-3">Data wpłaty</th>
+          <th class="px-4 py-3">
+            <a href={sortUrl("wilczek")} class="inline-flex items-center gap-1 hover:text-gray-700">
+              Wilczek <span class="text-gray-400">{sortIcon("wilczek")}</span>
+            </a>
+          </th>
+          <th class="px-4 py-3">
+            <a href={sortUrl("zaplacono")} class="inline-flex items-center gap-1 hover:text-gray-700">
+              Status <span class="text-gray-400">{sortIcon("zaplacono")}</span>
+            </a>
+          </th>
+          <th class="px-4 py-3">
+            <a href={sortUrl("kwota")} class="inline-flex items-center gap-1 hover:text-gray-700">
+              Kwota <span class="text-gray-400">{sortIcon("kwota")}</span>
+            </a>
+          </th>
+          <th class="px-4 py-3">
+            <a href={sortUrl("data_wplaty")} class="inline-flex items-center gap-1 hover:text-gray-700">
+              Data wpłaty <span class="text-gray-400">{sortIcon("data_wplaty")}</span>
+            </a>
+          </th>
           <th class="px-4 py-3"></th>
         </tr>
       </thead>
@@ -124,6 +178,8 @@ function formatDate(iso: string | null) {
   select?.addEventListener("change", () => {
     const url = new URL(window.location.href);
     url.searchParams.set("rok", select.value);
+    url.searchParams.delete("sort");
+    url.searchParams.delete("dir");
     window.location.href = url.toString();
   });
 </script>

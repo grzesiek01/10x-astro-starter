@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { Skladka, SkladkaFormData } from "@/types";
-import { isValidDataUrodzenia, dataUrodzeniaToIso, isoToDataUrodzenia } from "@/lib/validators";
+import { isValidDataUrodzenia, isFutureIsoDate, dataUrodzeniaToIso, isoToDataUrodzenia } from "@/lib/validators";
 
 interface Props {
   wilczekId: string;
@@ -52,8 +52,12 @@ export default function SkladkaForm({ wilczekId, skladka, existingLata }: Props)
     if (form.kwota && isNaN(parseFloat(form.kwota))) {
       next.kwota = "Kwota musi być liczbą";
     }
-    if (form.data_wplaty && !isValidDataUrodzenia(form.data_wplaty)) {
-      next.data_wplaty = "Nieprawidłowa data (format: DD.MM.RRRR)";
+    if (form.data_wplaty) {
+      if (!isValidDataUrodzenia(form.data_wplaty)) {
+        next.data_wplaty = "Nieprawidłowa data (format: DD.MM.RRRR)";
+      } else if (isFutureIsoDate(dataUrodzeniaToIso(form.data_wplaty))) {
+        next.data_wplaty = "Data wpłaty nie może być w przyszłości";
+      }
     }
     setErrors(next);
     return Object.keys(next).length === 0;

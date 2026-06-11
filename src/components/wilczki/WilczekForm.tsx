@@ -6,6 +6,7 @@ import {
   isValidPesel,
   isValidKodPocztowy,
   isValidDataUrodzenia,
+  isFutureIsoDate,
   dataUrodzeniaToIso,
   isoToDataUrodzenia,
 } from "@/lib/validators";
@@ -56,8 +57,13 @@ export default function WilczekForm({ wilczek }: Props) {
     const next: typeof errors = {};
     if (!form.imie.trim()) next.imie = "Imię jest wymagane";
     if (!form.nazwisko.trim()) next.nazwisko = "Nazwisko jest wymagane";
-    if (form.data_urodzenia && !isValidDataUrodzenia(form.data_urodzenia))
-      next.data_urodzenia = "Nieprawidłowa data (format: DD.MM.RRRR)";
+    if (form.data_urodzenia) {
+      if (!isValidDataUrodzenia(form.data_urodzenia)) {
+        next.data_urodzenia = "Nieprawidłowa data (format: DD.MM.RRRR)";
+      } else if (isFutureIsoDate(dataUrodzeniaToIso(form.data_urodzenia))) {
+        next.data_urodzenia = "Data urodzenia nie może być w przyszłości";
+      }
+    }
     if (form.pesel && !isValidPesel(form.pesel)) next.pesel = "Nieprawidłowy numer PESEL";
     if (form.kod_pocztowy && !isValidKodPocztowy(form.kod_pocztowy))
       next.kod_pocztowy = "Nieprawidłowy kod pocztowy (format: XX-XXX)";

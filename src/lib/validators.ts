@@ -35,3 +35,7 @@ export function isoToDataUrodzenia(val: string): string {
   const [year, month, day] = val.split("-");
   return `${day}.${month}.${year}`;
 }
+
+export function isFutureIsoDate(iso: string): boolean {
+  return iso > new Date().toISOString().split("T")[0];
+}

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { Funkcja, FunkcjaFormData } from "@/types";
+import { isFutureIsoDate } from "@/lib/validators";
 
 const FUNKCJE_NAMES = ["Szóstkowy", "Czołowy"] as const;
 
@@ -30,9 +31,17 @@ export default function FunkcjaForm({ wilczekId, funkcja }: Props) {
 
   function validate() {
     const next: typeof errors = {};
-    if (!form.data_od) next.data_od = "Data objęcia funkcji jest wymagana";
-    if (form.data_do && form.data_od && form.data_do < form.data_od) {
-      next.data_do = "Data zakończenia nie może być wcześniejsza niż data objęcia";
+    if (!form.data_od) {
+      next.data_od = "Data objęcia funkcji jest wymagana";
+    } else if (isFutureIsoDate(form.data_od)) {
+      next.data_od = "Data objęcia nie może być w przyszłości";
+    }
+    if (form.data_do) {
+      if (form.data_od && form.data_do < form.data_od) {
+        next.data_do = "Data zakończenia nie może być wcześniejsza niż data objęcia";
+      } else if (isFutureIsoDate(form.data_do)) {
+        next.data_do = "Data zakończenia nie może być w przyszłości";
+      }
     }
     setErrors(next);
     return Object.keys(next).length === 0;
